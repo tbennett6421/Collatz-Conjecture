@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-
-__code_desc__ = "Given start/stop integers, the program brute forces collatz conjecture"
+__code_desc__ = "Given start/stop integers, the program brute forces collatz conjecture chains"
 __code_version__ = 'v0.0.1'
 __code_debug__ = False
 
 ## Standard Libraries
-import sys
 import argparse
 import atexit
 import signal
@@ -27,24 +25,30 @@ def do_mod(i):
 
 def apply_logic(i):
     loop = [1, 2, 4]
-    if i in loop:
-        return True
+    chain = [i]
+    while i not in loop:
+        i = do_mod(i)
+        chain.append(i)
+    return chain
+
+def response(i, chain, verbose):
+    if verbose == 1:
+        print(f"{i} → Length: {len(chain)}")
+    elif verbose >= 2:
+        print(f"{i} → Length: {len(chain)} → Chain: {chain}")
     else:
-        while i not in loop:
-            i = do_mod(i)
-            if i in loop:
-                return True
+        print(f"{i} loops")
 
-def response(i):
-    print("%d loops" % i)
-
-def process(i):
-    return apply_logic(i)
+def process(i, verbose):
+    chain = apply_logic(i)
+    if chain:
+        response(i, chain, verbose)
+        return True
+    return False
 
 def cleanup():
     global STATE
     print("AtExit, ended on %s" % (STATE) )
-    sys.exit(0)
 
 def signal_handler(sig, frame):
     cleanup()
@@ -60,30 +64,27 @@ def main():
 
     # Register handlers
     atexit.register(cleanup)
-    for i in [x for x in dir(signal) if x.startswith("SIG")]:
-        try:
+    for i in dir(signal):
+        if i.startswith("SIG") and '_' not in i:
             signum = getattr(signal, i)
-            signal.signal(signum, signal_handler)
-        except (OSError, RuntimeError, ValueError) as m:
-            print("Skipping {}".format(i))
+            if isinstance(signum, int):
+                try:
+                    signal.signal(signum, signal_handler)
+                except (OSError, RuntimeError, ValueError):
+                    pass
     try:
         if args.stop and args.initial:
-            i = int(args.initial)
-            j = int(args.stop)
-            for k in range(i, j):
-                b = process(k)
-                if b:
-                    STATE = k
-                    response(k)
-                k = k + 1
+            idx = int(args.initial)
+            jdx = int(args.stop)
+            for kdx in range(idx, jdx):
+                if process(kdx, args.verbose):
+                    STATE = kdx
         elif args.initial:
-            i = int(args.initial)
+            idx = int(args.initial)
             while True:
-                b = process(i)
-                if b:
-                    STATE = i
-                    response(i)
-                i = i + 1
+                if process(idx, args.verbose):
+                    STATE = idx
+                idx = idx + 1
     except KeyboardInterrupt:
         print("Caught Exception, ended on %s" % (STATE) )
     except Exception:
